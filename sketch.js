@@ -288,15 +288,4 @@ function createExplosion(x, y, col) {
   }
 }
 
-  drawRoundedStar(x, y, r1, r2, n) {
-    let angle = TWO_PI / n;
-    beginShape();
-    for (let a = 0; a < TWO_PI + angle * 2; a += angle) {
-      curveVertex(x + cos(a) * r1, y + sin(a) * r1);
-      curveVertex(x + cos(a + angle / 2) * r2, y + sin(a + angle / 2) * r2);
-    }
-    endShape(CLOSE);
-  }
-}
-
 function windowResized() { resizeCanvas(windowWidth, windowHeight); }
