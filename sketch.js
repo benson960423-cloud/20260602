@@ -1,4 +1,6 @@
 let stars = [];
+let missiles = [];
+let explosions = [];
 const colors = ['#ffbe0b', '#fb5607', '#ff006e', '#8338ec', '#3a86ff'];
 let lastSpawnTime = 0;
 
@@ -20,17 +22,47 @@ function draw() {
     lastSpawnTime = millis();
   }
 
-  for (let i = 0; i < stars.size; i++) {
+  // 處理粒子間的碰撞
+  for (let i = 0; i < stars.length; i++) {
     // 處理與其他星星的碰撞
     for (let j = i + 1; j < stars.length; j++) {
       stars[i].checkCollision(stars[j]);
     }
   }
 
+  // 更新與顯示星星
   for (let star of stars) {
     star.update();
     star.display();
   }
+
+  // 更新與顯示飛彈，並偵測與星星的碰撞
+  for (let i = missiles.length - 1; i >= 0; i--) {
+    missiles[i].update();
+    missiles[i].display();
+    
+    for (let j = stars.length - 1; j >= 0; j--) {
+      if (missiles[i].hits(stars[j])) {
+        createExplosion(stars[j].x, stars[j].y, stars[j].color);
+        stars.splice(j, 1);
+        missiles.splice(i, 1);
+        break; 
+      }
+    }
+    // 移除超出螢幕的飛彈
+    if (missiles[i] && missiles[i].isOffScreen()) {
+      missiles.splice(i, 1);
+    }
+  }
+
+  // 更新與顯示爆炸特效
+  for (let i = explosions.length - 1; i >= 0; i--) {
+    explosions[i].update();
+    explosions[i].display();
+    if (explosions[i].isDead()) explosions.splice(i, 1);
+  }
+
+  drawArrow();
 }
 
 class Star {
@@ -136,6 +168,125 @@ class Star {
     
     pop();
   }
+
+  hits(other) {
+    return dist(this.x, this.y, other.x, other.y) < this.radius;
+  }
+
+  drawRoundedStar(x, y, r1, r2, n) {
+    let angle = TWO_PI / n;
+    beginShape();
+    for (let a = 0; a < TWO_PI + angle * 2; a += angle) {
+      curveVertex(x + cos(a) * r1, y + sin(a) * r1);
+      curveVertex(x + cos(a + angle / 2) * r2, y + sin(a + angle / 2) * r2);
+    }
+    endShape(CLOSE);
+  }
+}
+
+class Missile {
+  constructor(x, y, targetX, targetY) {
+    this.x = x;
+    this.y = y;
+    this.history = []; // 用於存放歷史座標以產生拖影
+    let angle = atan2(targetY - y, targetX - x);
+    this.vx = cos(angle) * 10;
+    this.vy = sin(angle) * 10;
+    this.color = color('#daff11'); // 螢光黃
+  }
+
+  update() {
+    // 紀錄歷史位置
+    this.history.push(createVector(this.x, this.y));
+    if (this.history.length > 10) this.history.shift();
+
+    this.x += this.vx;
+    this.y += this.vy;
+  }
+
+  display() {
+    // 繪製拖影
+    for (let i = 0; i < this.history.length; i++) {
+      let pos = this.history[i];
+      let alpha = map(i, 0, this.history.length, 0, 150);
+      fill(219, 255, 17, alpha);
+      noStroke();
+      ellipse(pos.x, pos.y, 5);
+    }
+
+    // 繪製本體
+    fill(this.color);
+    ellipse(this.x, this.y, 8);
+  }
+
+  hits(star) {
+    let d = dist(this.x, this.y, star.x, star.y);
+    return d < star.radius;
+  }
+
+  isOffScreen() {
+    return (this.x < 0 || this.x > width || this.y < 0 || this.y > height);
+  }
+}
+
+class ExplosionParticle {
+  constructor(x, y, col) {
+    this.x = x;
+    this.y = y;
+    this.vx = random(-5, 5);
+    this.vy = random(-5, 5);
+    this.alpha = 255;
+    this.color = col;
+  }
+
+  update() {
+    this.x += this.vx;
+    this.y += this.vy;
+    this.alpha -= 10;
+  }
+
+  display() {
+    noStroke();
+    let c = color(this.color);
+    fill(red(c), green(c), blue(c), this.alpha);
+    ellipse(this.x, this.y, 4);
+  }
+
+  isDead() {
+    return this.alpha <= 0;
+  }
+}
+
+function drawArrow() {
+  push();
+  translate(width / 2, height / 2);
+  let angle = atan2(mouseY - height / 2, mouseX - width / 2);
+  rotate(angle);
+  
+  // 繪製發射台箭頭
+  fill(255);
+  noStroke();
+  rectMode(CENTER);
+  rect(-10, 0, 40, 15, 5); // 箭身
+  triangle(10, -15, 10, 15, 35, 0); // 箭頭
+  
+  // 箭頭中間加一點細節
+  fill(0);
+  ellipse(15, 0, 5);
+  pop();
+}
+
+function mousePressed() {
+  if (mouseButton === LEFT) {
+    missiles.push(new Missile(width / 2, height / 2, mouseX, mouseY));
+  }
+}
+
+function createExplosion(x, y, col) {
+  for (let i = 0; i < 15; i++) {
+    explosions.push(new ExplosionParticle(x, y, col));
+  }
+}
 
   drawRoundedStar(x, y, r1, r2, n) {
     let angle = TWO_PI / n;
